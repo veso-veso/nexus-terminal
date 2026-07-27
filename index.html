@@ -2,8 +2,13 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Tagi PWA dla iOS - blokada zoomu i pełen ekran -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
     <title>NEXUS // Terminal Dyscypliny</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -27,7 +32,16 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        body { background-color: #000; color: #fff; }
+        /* Optymalizacja Safe Area na iPhone */
+        body { 
+            background-color: #000; 
+            color: #fff;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            -webkit-tap-highlight-color: transparent; /* Usuwa niebieski flash przy klikaniu na iOS */
+        }
         .xp-bar-transition { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #000; }
@@ -37,6 +51,8 @@
             filter: invert(1);
             cursor: pointer;
         }
+        /* Zabezpieczenie przed rozlaniem pop-upów */
+        .modal-scroll { max-height: 85vh; overflow-y: auto; }
     </style>
 </head>
 <body class="font-mono antialiased min-h-screen selection:bg-accent selection:text-white">
@@ -86,25 +102,25 @@
         };
 
         const IconEdit = () => (
-            <svg className="w-4 h-4 text-muted hover:text-white cursor-pointer transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+            <svg className="w-5 h-5 md:w-4 md:h-4 text-muted hover:text-white cursor-pointer transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
         );
         const IconDelete = () => (
-            <svg className="w-4 h-4 text-muted hover:text-accent cursor-pointer transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            <svg className="w-5 h-5 md:w-4 md:h-4 text-muted hover:text-accent cursor-pointer transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
         );
 
         const StatCard = ({ statKey, label, level, xp }) => (
-            <div className="bg-panel border border-hud p-5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full border border-hud bg-black flex items-center justify-center font-bold text-sm tracking-widest text-white shadow-[0_0_15px_rgba(0,0,0,0.5)] shrink-0">
+            <div className="bg-panel border border-hud p-4 md:p-5 flex items-center gap-4 md:gap-5">
+                <div className="w-12 h-12 md:w-14 md:h-14 rounded-full border border-hud bg-black flex items-center justify-center font-bold text-xs md:text-sm tracking-widest text-white shadow-[0_0_15px_rgba(0,0,0,0.5)] shrink-0">
                     {statKey}
                 </div>
                 <div className="flex flex-col flex-1 w-full overflow-hidden">
-                    <span className="text-[10px] text-muted tracking-[0.2em] uppercase">{label}</span>
-                    <span className="text-xl font-bold tracking-widest mt-1">LVL {level}</span>
+                    <span className="text-[9px] md:text-[10px] text-muted tracking-[0.2em] uppercase">{label}</span>
+                    <span className="text-lg md:text-xl font-bold tracking-widest mt-1">LVL {level}</span>
                     <div className="flex items-center gap-3 mt-2">
                         <div className="h-1 flex-1 bg-black border border-hud">
                             <div className="h-full bg-white xp-bar-transition" style={{ width: `${Math.min(100, Math.max(0, xp))}%` }}></div>
                         </div>
-                        <span className="text-[10px] text-muted tracking-widest shrink-0">{xp} / 100 XP</span>
+                        <span className="text-[9px] md:text-[10px] text-muted tracking-widest shrink-0">{xp} / 100 XP</span>
                     </div>
                 </div>
             </div>
@@ -265,7 +281,7 @@
                     title: newTitle.toUpperCase(),
                     stat: newStat,
                     xp: parseInt(newQuestXp),
-                    penalty: parseInt(newQuestXp), // Kara jest równa potencjalnej nagrodzie
+                    penalty: parseInt(newQuestXp), 
                     deadline: deadlineMs,
                     done: false,
                     failed: false
@@ -278,33 +294,33 @@
             const dailiesCleared = dailies.filter(d => d.completedDate === getDayKey(now)).length;
 
             return (
-                <div className="max-w-4xl mx-auto p-4 md:p-8 flex flex-col gap-10">
+                <div className="max-w-4xl mx-auto p-4 md:p-8 flex flex-col gap-8 md:gap-10 pb-20">
                     
-                    <header className="border border-hud p-6 bg-panel">
+                    <header className="border border-hud p-5 md:p-6 bg-panel">
                         <div className="flex justify-between items-end mb-4">
                             <div>
-                                <h2 className="text-muted text-xs tracking-[0.3em] mb-1">OPERATOR STATUS</h2>
-                                <h1 className="text-4xl font-bold tracking-wider">GLOBAL LEVEL: {String(player.level).padStart(2, '0')}</h1>
+                                <h2 className="text-muted text-[10px] md:text-xs tracking-[0.3em] mb-1">OPERATOR STATUS</h2>
+                                <h1 className="text-2xl md:text-4xl font-bold tracking-wider">GLOBAL LEVEL: {String(player.level).padStart(2, '0')}</h1>
                             </div>
-                            <div className="text-right text-xs text-accent tracking-widest font-bold">
-                                SYSTEM <span className="animate-pulse">●</span> ONLINE
+                            <div className="text-right text-[10px] md:text-xs text-accent tracking-widest font-bold">
+                                SYSTEM <span className="animate-pulse">●</span>
                             </div>
                         </div>
-                        <div className="flex justify-between text-[10px] text-muted mb-2 tracking-widest mt-8">
+                        <div className="flex justify-between text-[9px] md:text-[10px] text-muted mb-2 tracking-widest mt-6 md:mt-8">
                             <span>MAIN XP</span>
                             <span>{player.xp} / {player.reqXp} XP</span>
                         </div>
                         <div className="h-1.5 w-full bg-black border border-hud">
                             <div className="h-full bg-white xp-bar-transition" style={{ width: `${progressPerc}%` }}></div>
                         </div>
-                        <div className="text-right text-[10px] text-muted tracking-widest mt-2 uppercase">
+                        <div className="text-right text-[9px] md:text-[10px] text-muted tracking-widest mt-2 uppercase">
                             {Math.floor(progressPerc)}% TO NEXT GLOBAL LEVEL
                         </div>
                     </header>
 
                     <section>
-                        <div className="flex items-center gap-4 mb-6">
-                            <span className="text-[10px] text-muted tracking-[0.3em] uppercase">CHARACTER SHEET</span>
+                        <div className="flex items-center gap-4 mb-4 md:mb-6">
+                            <span className="text-[9px] md:text-[10px] text-muted tracking-[0.3em] uppercase">CHARACTER SHEET</span>
                             <div className="flex-1 h-[1px] bg-hud"></div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -315,12 +331,13 @@
                     </section>
 
                     <section>
-                        <div className="flex items-center justify-between gap-4 mb-6">
-                            <span className="text-[10px] text-muted tracking-[0.3em] uppercase">RECURRING DAILIES</span>
+                        <div className="flex items-center justify-between gap-4 mb-4 md:mb-6">
+                            <span className="text-[9px] md:text-[10px] text-muted tracking-[0.3em] uppercase hidden sm:inline">RECURRING DAILIES</span>
+                            <span className="text-[9px] md:text-[10px] text-muted tracking-[0.3em] uppercase sm:hidden">DAILIES</span>
                             <div className="flex-1 h-[1px] bg-hud"></div>
-                            <span className="text-[10px] text-muted tracking-[0.3em]">{dailiesCleared}/{dailies.length} CLEARED</span>
-                            <button onClick={() => setDailyModalOpen(true)} className="text-[10px] text-accent hover:text-white tracking-[0.3em] uppercase transition-colors ml-4 shrink-0">
-                                + ADD DAILY
+                            <span className="text-[9px] md:text-[10px] text-muted tracking-[0.3em]">{dailiesCleared}/{dailies.length}</span>
+                            <button onClick={() => setDailyModalOpen(true)} className="text-[9px] md:text-[10px] text-accent hover:text-white tracking-[0.3em] uppercase transition-colors ml-2 md:ml-4 shrink-0">
+                                + ADD
                             </button>
                         </div>
                         <div className="flex flex-col border border-hud bg-panel">
@@ -328,24 +345,24 @@
                             {dailies.map((d, index) => {
                                 const isDone = d.completedDate === getDayKey(now);
                                 return (
-                                    <div key={d.id} className={`flex items-center justify-between p-4 ${index !== dailies.length - 1 ? 'border-b border-hud' : ''} ${isDone ? 'opacity-50' : ''}`}>
-                                        <div className="flex items-start gap-4 w-full">
-                                            <div onClick={() => handleDailyToggle(d.id)} className={`w-4 h-4 border flex items-center justify-center cursor-pointer mt-0.5 shrink-0 ${isDone ? 'border-muted' : 'border-hud hover:border-white transition-colors'}`}>
-                                                {isDone && <div className="w-2 h-2 bg-muted"></div>}
+                                    <div key={d.id} className={`flex flex-col md:flex-row md:items-center justify-between p-4 gap-4 ${index !== dailies.length - 1 ? 'border-b border-hud' : ''} ${isDone ? 'opacity-50' : ''}`}>
+                                        <div className="flex items-start gap-4 w-full md:w-auto">
+                                            <div onClick={() => handleDailyToggle(d.id)} className={`w-5 h-5 md:w-4 md:h-4 border flex items-center justify-center cursor-pointer shrink-0 ${isDone ? 'border-muted' : 'border-hud hover:border-white transition-colors'}`}>
+                                                {isDone && <div className="w-2.5 h-2.5 md:w-2 md:h-2 bg-muted"></div>}
                                             </div>
-                                            <div className="flex flex-col flex-1 overflow-hidden">
+                                            <div className="flex flex-col flex-1 overflow-hidden mt-0.5 md:mt-0">
                                                 <span className={`text-sm tracking-widest truncate ${isDone ? 'line-through text-muted' : 'text-white'}`}>{d.title}</span>
                                                 <span className="text-[10px] text-muted tracking-widest mt-1">+{d.xp} XP {d.stat}</span>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-6 shrink-0">
-                                            <div className="flex flex-col text-right">
+                                        <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto border-t border-hud pt-3 md:border-0 md:pt-0">
+                                            <div className="flex flex-col md:text-right">
                                                 <span className="text-sm font-bold tracking-widest">{d.time || "--:--"}</span>
-                                                <span className="text-[10px] text-muted tracking-widest mt-1">DAILY</span>
+                                                <span className="text-[9px] md:text-[10px] text-muted tracking-widest mt-1 uppercase">DAILY</span>
                                             </div>
-                                            <div className="flex items-center gap-3 ml-2">
-                                                <div onClick={() => editDaily(d.id, d.title, d.xp, d.time)}><IconEdit /></div>
-                                                <div onClick={() => deleteDaily(d.id)}><IconDelete /></div>
+                                            <div className="flex items-center gap-4 md:gap-3">
+                                                <div onClick={() => editDaily(d.id, d.title, d.xp, d.time)} className="p-2 -m-2 md:p-0 md:m-0"><IconEdit /></div>
+                                                <div onClick={() => deleteDaily(d.id)} className="p-2 -m-2 md:p-0 md:m-0"><IconDelete /></div>
                                             </div>
                                         </div>
                                     </div>
@@ -355,11 +372,12 @@
                     </section>
 
                     <section>
-                        <div className="flex items-center justify-between gap-4 mb-6">
-                            <span className="text-[10px] text-muted tracking-[0.3em] uppercase">ACTIVE DIRECTIVES</span>
+                        <div className="flex items-center justify-between gap-4 mb-4 md:mb-6">
+                            <span className="text-[9px] md:text-[10px] text-muted tracking-[0.3em] uppercase hidden sm:inline">ACTIVE DIRECTIVES</span>
+                            <span className="text-[9px] md:text-[10px] text-muted tracking-[0.3em] uppercase sm:hidden">DIRECTIVES</span>
                             <div className="flex-1 h-[1px] bg-hud"></div>
-                            <button onClick={() => setQuestModalOpen(true)} className="text-[10px] text-accent hover:text-white tracking-[0.3em] uppercase transition-colors ml-4 shrink-0">
-                                + DEPLOY OBJECTIVE
+                            <button onClick={() => setQuestModalOpen(true)} className="text-[9px] md:text-[10px] text-accent hover:text-white tracking-[0.3em] uppercase transition-colors ml-2 md:ml-4 shrink-0">
+                                + DEPLOY
                             </button>
                         </div>
                         <div className="flex flex-col border border-hud bg-panel">
@@ -369,33 +387,33 @@
                                 const isWarning = !q.done && !q.failed && timeRemaining < 3600000 && timeRemaining > 0;
                                 
                                 return (
-                                    <div key={q.id} className={`flex items-center justify-between p-4 ${index !== quests.length - 1 ? 'border-b border-hud' : ''} ${q.done ? 'opacity-50' : q.failed ? 'bg-red-900/10' : ''}`}>
-                                        <div className="flex items-start gap-4 w-full">
-                                            <div onClick={() => handleQuestToggle(q.id)} className={`w-4 h-4 border flex items-center justify-center mt-0.5 shrink-0 ${q.done ? 'border-muted' : q.failed ? 'border-accent opacity-50 cursor-not-allowed' : 'border-hud cursor-pointer hover:border-white transition-colors'}`}>
-                                                {q.done && <div className="w-2 h-2 bg-muted"></div>}
-                                                {q.failed && <div className="w-2 h-2 bg-accent"></div>}
+                                    <div key={q.id} className={`flex flex-col md:flex-row md:items-center justify-between p-4 gap-4 ${index !== quests.length - 1 ? 'border-b border-hud' : ''} ${q.done ? 'opacity-50' : q.failed ? 'bg-red-900/10' : ''}`}>
+                                        <div className="flex items-start gap-4 w-full md:w-auto">
+                                            <div onClick={() => handleQuestToggle(q.id)} className={`w-5 h-5 md:w-4 md:h-4 border flex items-center justify-center shrink-0 ${q.done ? 'border-muted' : q.failed ? 'border-accent opacity-50 cursor-not-allowed' : 'border-hud cursor-pointer hover:border-white transition-colors'}`}>
+                                                {q.done && <div className="w-2.5 h-2.5 md:w-2 md:h-2 bg-muted"></div>}
+                                                {q.failed && <div className="w-2.5 h-2.5 md:w-2 md:h-2 bg-accent"></div>}
                                             </div>
-                                            <div className="flex flex-col flex-1 overflow-hidden">
+                                            <div className="flex flex-col flex-1 overflow-hidden mt-0.5 md:mt-0">
                                                 <span className={`text-sm tracking-widest truncate ${q.done ? 'line-through text-muted' : q.failed ? 'text-accent' : 'text-white'}`}>{q.title}</span>
                                                 <span className="text-[10px] text-muted tracking-widest mt-1">
                                                     {q.failed ? `-${q.penalty} XP (PENALTY)` : `+${q.xp} XP ${q.stat}`}
                                                 </span>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-6 shrink-0">
-                                            <div className="flex flex-col text-right">
+                                        <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto border-t border-hud pt-3 md:border-0 md:pt-0">
+                                            <div className="flex flex-col md:text-right">
                                                 {!q.done && !q.failed && (
                                                     <>
-                                                        <span className={`text-sm tracking-widest ${isWarning ? 'text-accent animate-pulse' : 'text-white'}`}>
+                                                        <span className={`text-sm md:text-base tracking-widest ${isWarning ? 'text-accent animate-pulse' : 'text-white'}`}>
                                                             {formatTime(timeRemaining)}
                                                         </span>
-                                                        <span className="text-[10px] text-muted tracking-widest mt-1">REMAINING</span>
+                                                        <span className="text-[9px] md:text-[10px] text-muted tracking-widest mt-1">REMAINING</span>
                                                     </>
                                                 )}
-                                                {q.done && <span className="text-[10px] text-muted tracking-widest uppercase">CLEARED</span>}
-                                                {q.failed && <span className="text-[10px] text-accent tracking-widest uppercase animate-pulse">FAILED</span>}
+                                                {q.done && <span className="text-[9px] md:text-[10px] text-muted tracking-widest uppercase">CLEARED</span>}
+                                                {q.failed && <span className="text-[9px] md:text-[10px] text-accent tracking-widest uppercase animate-pulse">FAILED</span>}
                                             </div>
-                                            <div onClick={() => deleteQuest(q.id)}><IconDelete /></div>
+                                            <div onClick={() => deleteQuest(q.id)} className="p-2 -m-2 md:p-0 md:m-0"><IconDelete /></div>
                                         </div>
                                     </div>
                                 );
@@ -405,8 +423,8 @@
 
                     {/* QUEST MODAL */}
                     {isQuestModalOpen && (
-                        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-                            <div className="bg-panel border border-hud p-6 w-full max-w-lg shadow-[0_0_30px_rgba(220,38,38,0.1)]">
+                        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[100] p-4">
+                            <div className="bg-panel border border-hud p-5 md:p-6 w-full max-w-lg shadow-[0_0_30px_rgba(220,38,38,0.1)] modal-scroll">
                                 <h3 className="text-xs text-accent tracking-[0.3em] mb-6 border-b border-hud pb-2 uppercase">DEPLOY NEW OBJECTIVE</h3>
                                 <form onSubmit={createQuest} className="flex flex-col gap-5">
                                     <div>
@@ -423,7 +441,7 @@
                                                 <option value="DSC">DSC // DYSCYPLINA</option>
                                             </select>
                                         </div>
-                                        <div className="w-32">
+                                        <div className="w-full md:w-32">
                                             <label className="block text-[10px] text-muted tracking-widest mb-2">XP TIER</label>
                                             <select value={newQuestXp} onChange={e => setNewQuestXp(e.target.value)} className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-accent appearance-none">
                                                 <option value="10">10 XP</option>
@@ -432,18 +450,18 @@
                                                 <option value="100">100 XP</option>
                                             </select>
                                         </div>
-                                        <div className="flex-1 relative">
-                                            <label className="flex justify-between block text-[10px] text-muted tracking-widest mb-2">
-                                                <span>DEADLINE</span>
-                                            </label>
-                                            <input type="datetime-local" value={newDeadline} onChange={e => setNewDeadline(e.target.value)} className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-accent transition-colors" />
-                                        </div>
                                     </div>
-                                    <div className="flex justify-between items-center mt-4">
-                                        <button type="button" onClick={() => setNewDeadline(getEndOfDayString())} className="text-[10px] text-accent hover:text-white transition-colors tracking-widest">[ END OF DAY ]</button>
-                                        <div className="flex gap-4">
-                                            <button type="button" onClick={() => setQuestModalOpen(false)} className="px-6 py-3 text-xs tracking-widest text-muted hover:text-white transition-colors">CANCEL</button>
-                                            <button type="submit" className="bg-accent text-white px-8 py-3 text-xs tracking-widest font-bold hover:bg-red-700 transition-colors">ADD QUEST</button>
+                                    <div className="flex-1 relative">
+                                        <label className="flex justify-between block text-[10px] text-muted tracking-widest mb-2">
+                                            <span>DEADLINE</span>
+                                        </label>
+                                        <input type="datetime-local" value={newDeadline} onChange={e => setNewDeadline(e.target.value)} className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-accent transition-colors" />
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-4">
+                                        <button type="button" onClick={() => setNewDeadline(getEndOfDayString())} className="text-[10px] text-accent hover:text-white transition-colors tracking-widest border border-hud px-4 py-2 w-full sm:w-auto">[ END OF DAY ]</button>
+                                        <div className="flex gap-4 w-full sm:w-auto">
+                                            <button type="button" onClick={() => setQuestModalOpen(false)} className="flex-1 sm:flex-none px-6 py-3 text-xs tracking-widest text-muted hover:text-white border border-transparent transition-colors">CANCEL</button>
+                                            <button type="submit" className="flex-1 sm:flex-none bg-accent text-white px-8 py-3 text-xs tracking-widest font-bold hover:bg-red-700 transition-colors">ADD QUEST</button>
                                         </div>
                                     </div>
                                 </form>
@@ -453,8 +471,8 @@
 
                     {/* DAILY MODAL */}
                     {isDailyModalOpen && (
-                        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-                            <div className="bg-panel border border-hud p-6 w-full max-w-lg shadow-[0_0_30px_rgba(255,255,255,0.05)]">
+                        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[100] p-4">
+                            <div className="bg-panel border border-hud p-5 md:p-6 w-full max-w-lg shadow-[0_0_30px_rgba(255,255,255,0.05)] modal-scroll">
                                 <h3 className="text-xs text-white tracking-[0.3em] mb-6 border-b border-hud pb-2 uppercase">ADD RECURRING DAILY</h3>
                                 <form onSubmit={createDaily} className="flex flex-col gap-5">
                                     <div>
@@ -471,7 +489,7 @@
                                                 <option value="DSC">DSC</option>
                                             </select>
                                         </div>
-                                        <div className="w-32">
+                                        <div className="w-full md:w-32">
                                             <label className="block text-[10px] text-muted tracking-widest mb-2">XP TIER</label>
                                             <select value={newDailyXp} onChange={e => setNewDailyXp(e.target.value)} className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-white appearance-none">
                                                 <option value="10">10 XP</option>
@@ -480,14 +498,14 @@
                                                 <option value="100">100 XP</option>
                                             </select>
                                         </div>
-                                        <div className="w-32">
-                                            <label className="block text-[10px] text-muted tracking-widest mb-2">TIME (OPTIONAL)</label>
-                                            <input type="text" placeholder="05:30" value={newDailyTime} onChange={e => setNewDailyTime(e.target.value)} className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-white transition-colors" />
-                                        </div>
                                     </div>
-                                    <div className="flex justify-end gap-4 mt-4">
-                                        <button type="button" onClick={() => setDailyModalOpen(false)} className="px-6 py-3 text-xs tracking-widest text-muted hover:text-white transition-colors">CANCEL</button>
-                                        <button type="submit" className="bg-white text-black px-8 py-3 text-xs tracking-widest font-bold hover:bg-gray-200 transition-colors">ADD DAILY</button>
+                                    <div className="w-full md:w-1/2">
+                                        <label className="block text-[10px] text-muted tracking-widest mb-2">TIME (OPTIONAL)</label>
+                                        <input type="text" placeholder="05:30" value={newDailyTime} onChange={e => setNewDailyTime(e.target.value)} className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-white transition-colors" />
+                                    </div>
+                                    <div className="flex gap-4 mt-4 w-full justify-end">
+                                        <button type="button" onClick={() => setDailyModalOpen(false)} className="flex-1 sm:flex-none px-6 py-3 text-xs tracking-widest text-muted hover:text-white transition-colors">CANCEL</button>
+                                        <button type="submit" className="flex-1 sm:flex-none bg-white text-black px-8 py-3 text-xs tracking-widest font-bold hover:bg-gray-200 transition-colors">ADD DAILY</button>
                                     </div>
                                 </form>
                             </div>
