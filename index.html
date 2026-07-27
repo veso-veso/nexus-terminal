@@ -169,23 +169,20 @@
                 return "STATUS: OPERATOR INITIATE";
             }, [stats, lockdown]);
 
-            // BEZWSZGLĘDNY SYSTEM DODAWANIA XP I AWANSÓW (z krzywą trudności)
             const addXp = (amount, statKey) => {
                 const effectiveAmount = stats[statKey]?.rust ? Math.round(amount * 0.8) : amount;
                 
-                // Główny Gracz
                 setPlayer(prev => {
                     let { level, xp, reqXp } = prev;
                     xp += effectiveAmount;
                     while (xp >= reqXp) {
                         xp -= reqXp;
                         level += 1;
-                        reqXp = Math.floor(reqXp * 1.2); // 20% trudniejszy każdy kolejny level
+                        reqXp = Math.floor(reqXp * 1.2); 
                     }
                     return { level, xp, reqXp };
                 });
 
-                // Statystyka szczegółowa
                 setStats(prev => {
                     let stat = { ...prev[statKey] };
                     stat.xp += effectiveAmount;
@@ -198,24 +195,21 @@
                 });
             };
 
-            // BEZWZGLĘDNY SYSTEM ODEJMOWANIA XP I SPADKU POZIOMÓW (Level Down)
             const removeXp = (amount, statKey) => {
                 if (lockdown.active) return;
 
-                // Główny Gracz
                 setPlayer(prev => {
                     let { level, xp, reqXp } = prev;
                     xp -= amount;
                     while (xp < 0 && level > 1) {
                         level -= 1;
-                        reqXp = Math.floor(reqXp / 1.2); // Cofnięcie progu trudności
+                        reqXp = Math.floor(reqXp / 1.2); 
                         xp += reqXp;
                     }
-                    if (level === 1 && xp < 0) xp = 0; // Podłoga na 1 levelu
+                    if (level === 1 && xp < 0) xp = 0;
                     return { level, xp, reqXp };
                 });
 
-                // Statystyka szczegółowa
                 setStats(prev => {
                     let stat = { ...prev[statKey] };
                     stat.xp -= amount;
