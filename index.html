@@ -63,7 +63,37 @@
             const [storedValue, setStoredValue] = useState(() => {
                 try {
                     const item = window.localStorage.getItem(key);
-                    return item ? JSON.parse(item) : initialValue;
+                    if (!item) return initialValue;
+                    const parsed = JSON.parse(item);
+                    
+                    // Bezpieczna migracja dla statystyk, żeby nigdy nie zabrakło reqXp
+                    if (key === 'nexus_stats') {
+                        const defaults = initialValue;
+                        let updated = false;
+                        for (const k of Object.keys(defaults)) {
+                            if (!parsed[k]) {
+                                parsed[k] = defaults[k];
+                                updated = true;
+                            } else {
+                                if (typeof parsed[k].reqXp !== 'number' || isNaN(parsed[k].reqXp)) {
+                                    parsed[k].reqXp = defaults[k].reqXp;
+                                    updated = true;
+                                }
+                                if (typeof parsed[k].xp !== 'number' || isNaN(parsed[k].xp)) {
+                                    parsed[k].xp = defaults[k].xp;
+                                    updated = true;
+                                }
+                                if (typeof parsed[k].level !== 'number' || isNaN(parsed[k].level)) {
+                                    parsed[k].level = defaults[k].level;
+                                    updated = true;
+                                }
+                            }
+                        }
+                        if (updated) {
+                            window.localStorage.setItem(key, JSON.stringify(parsed));
+                        }
+                    }
+                    return parsed;
                 } catch (error) {
                     return initialValue;
                 }
@@ -109,26 +139,32 @@
             <svg className="w-5 h-5 md:w-4 md:h-4 text-muted hover:text-accent cursor-pointer transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
         );
 
-        const StatCard = ({ statKey, label, level, xp, reqXp, isRust }) => (
-            <div className={`bg-panel border rounded-2xl p-4 md:p-5 flex flex-col justify-between gap-4 shadow-lg relative overflow-hidden ${isRust ? 'border-accent/80 bg-red-950/20' : 'border-hud'}`}>
-                {isRust && <div className="absolute top-0 right-0 bg-accent text-white text-[8px] font-bold px-2 py-0.5 tracking-widest uppercase">RUST</div>}
-                <div className="flex items-center justify-between">
-                    <span className="w-12 h-12 md:w-14 md:h-14 rounded-xl border border-hud bg-black flex items-center justify-center font-bold text-sm md:text-base tracking-widest text-white shadow-md shrink-0">
-                        {statKey}
-                    </span>
-                    <div className="flex flex-col text-right">
-                        <span className="text-lg md:text-2xl font-bold tracking-wider">LVL {level}</span>
-                        <span className="text-[10px] md:text-xs text-muted tracking-widest">{Math.max(0, xp)} / {reqXp} XP</span>
+        const StatCard = ({ statKey, label, level, xp, reqXp, isRust }) => {
+            const currentReq = reqXp || 100;
+            const currentXp = xp || 0;
+            const percentage = Math.min(100, Math.max(0, (currentXp / currentReq) * 100));
+
+            return (
+                <div className={`bg-panel border rounded-2xl p-4 md:p-5 flex flex-col justify-between gap-4 shadow-lg relative overflow-hidden ${isRust ? 'border-accent/80 bg-red-950/20' : 'border-hud'}`}>
+                    {isRust && <div className="absolute top-0 right-0 bg-accent text-white text-[8px] font-bold px-2 py-0.5 tracking-widest uppercase">RUST</div>}
+                    <div className="flex items-center justify-between">
+                        <span className="w-12 h-12 md:w-14 md:h-14 rounded-xl border border-hud bg-black flex items-center justify-center font-bold text-sm md:text-base tracking-widest text-white shadow-md shrink-0">
+                            {statKey}
+                        </span>
+                        <div className="flex flex-col text-right">
+                            <span className="text-lg md:text-2xl font-bold tracking-wider">LVL {level || 1}</span>
+                            <span className="text-[10px] md:text-xs text-muted tracking-widest">{Math.max(0, currentXp)} / {currentReq} XP</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span className="text-xs md:text-sm font-bold tracking-[0.15em] text-white block mb-2 uppercase">{label}</span>
+                        <div className="h-2 w-full bg-black border border-hud rounded-full overflow-hidden">
+                            <div className={`h-full xp-bar-transition rounded-full ${isRust ? 'bg-accent' : 'bg-white'}`} style={{ width: `${percentage}%` }}></div>
+                        </div>
                     </div>
                 </div>
-                <div>
-                    <span className="text-xs md:text-sm font-bold tracking-[0.15em] text-white block mb-2 uppercase">{label}</span>
-                    <div className="h-2 w-full bg-black border border-hud rounded-full overflow-hidden">
-                        <div className={`h-full xp-bar-transition rounded-full ${isRust ? 'bg-accent' : 'bg-white'}`} style={{ width: `${Math.min(100, Math.max(0, (xp / reqXp) * 100))}%` }}></div>
-                    </div>
-                </div>
-            </div>
-        );
+            );
+        };
 
         function App() {
             const [player, setPlayer] = useLocalStorage('nexus_player', { level: 1, xp: 0, reqXp: 500 });
@@ -161,11 +197,11 @@
 
             const operatorTitle = useMemo(() => {
                 if (lockdown.active) return "PROTOCOL LOCKDOWN";
-                const totalStats = stats.STR.level + stats.END.level + stats.INT.level + stats.DSC.level;
+                const totalStats = (stats.STR?.level || 1) + (stats.END?.level || 1) + (stats.INT?.level || 1) + (stats.DSC?.level || 1);
                 if (totalStats >= 25) return "STATUS: ELITE OPERATOR";
-                if (stats.STR.level >= stats.DSC.level) return "STATUS: JUGGERNAUT";
-                if (stats.INT.level >= stats.STR.level) return "STATUS: ARCHITECT";
-                if (stats.DSC.level >= 5) return "STATUS: VANGUARD";
+                if ((stats.STR?.level || 1) >= (stats.DSC?.level || 1)) return "STATUS: JUGGERNAUT";
+                if ((stats.INT?.level || 1) >= (stats.STR?.level || 1)) return "STATUS: ARCHITECT";
+                if ((stats.DSC?.level || 1) >= 5) return "STATUS: VANGUARD";
                 return "STATUS: OPERATOR INITIATE";
             }, [stats, lockdown]);
 
@@ -184,7 +220,7 @@
                 });
 
                 setStats(prev => {
-                    let stat = { ...prev[statKey] };
+                    let stat = { ...prev[statKey], reqXp: prev[statKey].reqXp || 100 };
                     stat.xp += effectiveAmount;
                     while (stat.xp >= stat.reqXp) {
                         stat.xp -= stat.reqXp;
@@ -211,7 +247,7 @@
                 });
 
                 setStats(prev => {
-                    let stat = { ...prev[statKey] };
+                    let stat = { ...prev[statKey], reqXp: prev[statKey].reqXp || 100 };
                     stat.xp -= amount;
                     while (stat.xp < 0 && stat.level > 1) {
                         stat.level -= 1;
@@ -380,7 +416,9 @@
                 }
             };
 
-            const progressPerc = Math.min(100, Math.max(0, (player.xp / player.reqXp) * 100));
+            const playerReq = player?.reqXp || 500;
+            const playerXp = player?.xp || 0;
+            const progressPerc = Math.min(100, Math.max(0, (playerXp / playerReq) * 100));
             const dailiesCleared = dailies.filter(d => d.completedDate === getDayKey(now)).length;
 
             return (
@@ -391,7 +429,7 @@
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-4 gap-3">
                             <div>
                                 <h2 className="text-muted text-[10px] md:text-xs tracking-[0.3em] mb-1">{operatorTitle}</h2>
-                                <h1 className="text-2xl md:text-4xl font-bold tracking-wider">GLOBAL LEVEL: {String(player.level).padStart(2, '0')}</h1>
+                                <h1 className="text-2xl md:text-4xl font-bold tracking-wider">GLOBAL LEVEL: {String(player?.level || 1).padStart(2, '0')}</h1>
                             </div>
                             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
                                 <button onClick={toggleLockdown} className={`px-3 py-1.5 rounded-lg text-[9px] tracking-widest font-bold uppercase transition-colors border ${lockdown.active ? 'bg-accent text-white border-accent animate-pulse' : 'bg-black text-muted border-hud hover:text-white'}`}>
@@ -404,7 +442,7 @@
                         </div>
                         <div className="flex justify-between text-[9px] md:text-[10px] text-muted mb-2 tracking-widest mt-6 md:mt-8">
                             <span>MAIN XP</span>
-                            <span>{Math.max(0, player.xp)} / {player.reqXp} XP</span>
+                            <span>{Math.max(0, playerXp)} / {playerReq} XP</span>
                         </div>
                         <div className="h-2 w-full bg-black border border-hud rounded-full overflow-hidden">
                             <div className="h-full bg-white xp-bar-transition rounded-full" style={{ width: `${progressPerc}%` }}></div>
