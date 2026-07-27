@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS // Terminal Dyscypliny</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        black: '#000000',
+                        panel: '#111111',
+                        hud: '#1a1a1a',
+                        accent: '#dc2626', 
+                        muted: '#6b7280'
+                    },
+                    fontFamily: {
+                        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { background-color: #000; color: #fff; }
+        .xp-bar-transition { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; }
+        
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="font-mono antialiased min-h-screen selection:bg-accent selection:text-white">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        function useLocalStorage(key, initialValue) {
+            const [storedValue, setStoredValue] = useState(() => {
+                try {
+                    const item = window.localStorage.getItem(key);
+                    return item ? JSON.parse(item) : initialValue;
+                } catch (error) {
+                    return initialValue;
+                }
+            });
+
+            const setValue = (value) => {
+                try {
+                    const valueToStore = value instanceof Function ? value(storedValue) : value;
+                    setStoredValue(valueToStore);
+                    window.localStorage.setItem(key, JSON.stringify(valueToStore));
+                } catch (error) {}
+            };
+            return [storedValue, setValue];
+        }
+
+        const getDayKey = (ts) => {
+            const d = new Date(ts);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
+        const formatTime = (ms) => {
+            if (ms <= 0) return "00:00:00";
+            const h = Math.floor(ms / 3600000);
+            const m = Math.floor((ms % 3600000) / 60000);
+            const s = Math.floor((ms % 60000) / 1000);
+            return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        };
+
+        const getEndOfDayString = () => {
+            const now = new Date();
+            now.setHours(23, 59, 0, 0);
+            const tzoffset = now.getTimezoneOffset() * 60000;
+            return (new Date(now.getTime() - tzoffset)).toISOString().slice(0, 16);
+        };
+
+        const IconEdit = () => (
+            <svg className="w-4 h-4 text-muted hover:text-white cursor-pointer transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+        );
+        const IconDelete = () => (
+            <svg className="w-4 h-4 text-muted hover:text-accent cursor-pointer transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+        );
+
+        const StatCard = ({ statKey, label, level, xp }) => (
+            <div className="bg-panel border border-hud p-5 flex items-center gap-5">
+                <div className="w-14 h-14 rounded-full border border-hud bg-black flex items-center justify-center font-bold text-sm tracking-widest text-white shadow-[0_0_15px_rgba(0,0,0,0.5)] shrink-0">
+                    {statKey}
+                </div>
+                <div className="flex flex-col flex-1 w-full overflow-hidden">
+                    <span className="text-[10px] text-muted tracking-[0.2em] uppercase">{label}</span>
+                    <span className="text-xl font-bold tracking-widest mt-1">LVL {level}</span>
+                    <div className="flex items-center gap-3 mt-2">
+                        <div className="h-1 flex-1 bg-black border border-hud">
+                            <div className="h-full bg-white xp-bar-transition" style={{ width: `${Math.min(100, Math.max(0, xp))}%` }}></div>
+                        </div>
+                        <span className="text-[10px] text-muted tracking-widest shrink-0">{xp} / 100 XP</span>
+                    </div>
+                </div>
+            </div>
+        );
+
+        function App() {
+            const [player, setPlayer] = useLocalStorage('nexus_player', { level: 1, xp: 0, reqXp: 500 });
+            const [stats, setStats] = useLocalStorage('nexus_stats', {
+                STR: { level: 1, xp: 0, label: "SIŁA" },
+                END: { level: 1, xp: 0, label: "WYTRZYMAŁOŚĆ" },
+                INT: { level: 1, xp: 0, label: "INTELEKT" },
+                DSC: { level: 1, xp: 0, label: "DYSCYPLINA" },
+            });
+            const [dailies, setDailies] = useLocalStorage('nexus_dailies', [
+                { id: 'd1', title: 'POBUDKA 05:30', xp: 30, stat: 'DSC', time: '05:30', completedDate: null },
+                { id: 'd2', title: 'TRENING // RUCH', xp: 50, stat: 'STR', time: '07:00', completedDate: null },
+                { id: 'd3', title: 'SEN 22:30', xp: 30, stat: 'END', time: '22:30', completedDate: null }
+            ]);
+            const [quests, setQuests] = useLocalStorage('nexus_quests', []);
+            const [lastLogin, setLastLogin] = useLocalStorage('nexus_last_login', getDayKey(Date.now()));
+            const [now, setNow] = useState(Date.now());
+
+            const [isQuestModalOpen, setQuestModalOpen] = useState(false);
+            const [isDailyModalOpen, setDailyModalOpen] = useState(false);
+
+            useEffect(() => {
+                const interval = setInterval(() => setNow(Date.now()), 1000);
+                return () => clearInterval(interval);
+            }, []);
+
+            const addXp = (amount, statKey) => {
+                setPlayer(prev => {
+                    let { level, xp, reqXp } = prev;
+                    xp += amount;
+                    while (xp >= reqXp) {
+                        xp -= reqXp;
+                        level += 1;
+                        reqXp = Math.floor(reqXp * 1.2); 
+                    }
+                    return { level, xp, reqXp };
+                });
+
+                setStats(prev => {
+                    let stat = { ...prev[statKey] };
+                    stat.xp += amount;
+                    while(stat.xp >= 100) {
+                        stat.xp -= 100;
+                        stat.level += 1;
+                    }
+                    return { ...prev, [statKey]: stat };
+                });
+            };
+
+            const removeXp = (amount, statKey) => {
+                setPlayer(prev => {
+                    let { level, xp, reqXp } = prev;
+                    xp -= amount;
+                    return { level, xp, reqXp };
+                });
+
+                setStats(prev => {
+                    let stat = { ...prev[statKey] };
+                    stat.xp -= amount;
+                    return { ...prev, [statKey]: stat };
+                });
+            };
+
+            useEffect(() => {
+                quests.forEach(q => {
+                    if (!q.done && !q.failed && q.deadline <= now) {
+                        setQuests(prev => prev.map(x => x.id === q.id ? { ...x, failed: true } : x));
+                        removeXp(q.penalty, q.stat);
+                    }
+                });
+            }, [now, quests]);
+
+            useEffect(() => {
+                const today = getDayKey(now);
+                if (lastLogin !== today) {
+                    setDailies(prev => prev.map(d => ({ ...d, completedDate: null })));
+                    setLastLogin(today);
+                }
+            }, [now, lastLogin]);
+
+            const handleDailyToggle = (id) => {
+                setDailies(prev => prev.map(d => {
+                    if (d.id === id) {
+                        const isDone = d.completedDate === getDayKey(now);
+                        if (!isDone) addXp(d.xp, d.stat);
+                        if (isDone) removeXp(d.xp, d.stat);
+                        return { ...d, completedDate: isDone ? null : getDayKey(now) };
+                    }
+                    return d;
+                }));
+            };
+
+            const deleteDaily = (id) => setDailies(prev => prev.filter(d => d.id !== id));
+            
+            const editDaily = (id, oldTitle, oldXp, oldTime) => {
+                const newTitle = prompt("Edytuj cel zadania:", oldTitle);
+                if (newTitle === null) return;
+                
+                const newXpStr = prompt("Edytuj wartość XP (np. 10, 30, 50):", oldXp);
+                if (newXpStr === null) return;
+                const newXp = parseInt(newXpStr);
+                if (isNaN(newXp)) return;
+
+                const newTime = prompt("Edytuj godzinę (opcjonalnie, np. 05:30):", oldTime || "");
+                if (newTime === null) return;
+
+                setDailies(prev => prev.map(d => d.id === id ? { ...d, title: newTitle.toUpperCase(), xp: newXp, time: newTime } : d));
+            };
+
+            const handleQuestToggle = (id) => {
+                setQuests(prev => prev.map(q => {
+                    if (q.id === id && !q.failed && q.deadline > now) {
+                        if (!q.done) addXp(q.xp, q.stat);
+                        return { ...q, done: true }; 
+                    }
+                    return q;
+                }));
+            };
+
+            const deleteQuest = (id) => setQuests(prev => prev.filter(q => q.id !== id));
+
+            const [newDailyTitle, setNewDailyTitle] = useState("");
+            const [newDailyStat, setNewDailyStat] = useState("DSC");
+            const [newDailyXp, setNewDailyXp] = useState(30);
+            const [newDailyTime, setNewDailyTime] = useState("");
+
+            const createDaily = (e) => {
+                e.preventDefault();
+                if (!newDailyTitle.trim()) return;
+                setDailies(prev => [...prev, {
+                    id: `d_${Date.now()}`,
+                    title: newDailyTitle.toUpperCase(),
+                    stat: newDailyStat,
+                    xp: parseInt(newDailyXp),
+                    time: newDailyTime,
+                    completedDate: null
+                }]);
+                setNewDailyTitle("");
+                setDailyModalOpen(false);
+            };
+
+            const [newTitle, setNewTitle] = useState("");
+            const [newStat, setNewStat] = useState("STR");
+            const [newQuestXp, setNewQuestXp] = useState(50);
+            const [newDeadline, setNewDeadline] = useState(getEndOfDayString());
+
+            const createQuest = (e) => {
+                e.preventDefault();
+                if (!newTitle.trim() || !newDeadline) return;
+                
+                const deadlineMs = new Date(newDeadline).getTime();
+                setQuests(prev => [...prev, {
+                    id: `q_${Date.now()}`,
+                    title: newTitle.toUpperCase(),
+                    stat: newStat,
+                    xp: parseInt(newQuestXp),
+                    penalty: parseInt(newQuestXp), // Kara jest równa potencjalnej nagrodzie
+                    deadline: deadlineMs,
+                    done: false,
+                    failed: false
+                }]);
+                setNewTitle("");
+                setQuestModalOpen(false);
+            };
+
+            const progressPerc = Math.min(100, Math.max(0, (player.xp / player.reqXp) * 100));
+            const dailiesCleared = dailies.filter(d => d.completedDate === getDayKey(now)).length;
+
+            return (
+                <div className="max-w-4xl mx-auto p-4 md:p-8 flex flex-col gap-10">
+                    
+                    <header className="border border-hud p-6 bg-panel">
+                        <div className="flex justify-between items-end mb-4">
+                            <div>
+                                <h2 className="text-muted text-xs tracking-[0.3em] mb-1">OPERATOR STATUS</h2>
+                                <h1 className="text-4xl font-bold tracking-wider">GLOBAL LEVEL: {String(player.level).padStart(2, '0')}</h1>
+                            </div>
+                            <div className="text-right text-xs text-accent tracking-widest font-bold">
+                                SYSTEM <span className="animate-pulse">●</span> ONLINE
+                            </div>
+                        </div>
+                        <div className="flex justify-between text-[10px] text-muted mb-2 tracking-widest mt-8">
+                            <span>MAIN XP</span>
+                            <span>{player.xp} / {player.reqXp} XP</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-black border border-hud">
+                            <div className="h-full bg-white xp-bar-transition" style={{ width: `${progressPerc}%` }}></div>
+                        </div>
+                        <div className="text-right text-[10px] text-muted tracking-widest mt-2 uppercase">
+                            {Math.floor(progressPerc)}% TO NEXT GLOBAL LEVEL
+                        </div>
+                    </header>
+
+                    <section>
+                        <div className="flex items-center gap-4 mb-6">
+                            <span className="text-[10px] text-muted tracking-[0.3em] uppercase">CHARACTER SHEET</span>
+                            <div className="flex-1 h-[1px] bg-hud"></div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {Object.entries(stats).map(([key, data]) => (
+                                <StatCard key={key} statKey={key} label={data.label} level={data.level} xp={data.xp} />
+                            ))}
+                        </div>
+                    </section>
+
+                    <section>
+                        <div className="flex items-center justify-between gap-4 mb-6">
+                            <span className="text-[10px] text-muted tracking-[0.3em] uppercase">RECURRING DAILIES</span>
+                            <div className="flex-1 h-[1px] bg-hud"></div>
+                            <span className="text-[10px] text-muted tracking-[0.3em]">{dailiesCleared}/{dailies.length} CLEARED</span>
+                            <button onClick={() => setDailyModalOpen(true)} className="text-[10px] text-accent hover:text-white tracking-[0.3em] uppercase transition-colors ml-4 shrink-0">
+                                + ADD DAILY
+                            </button>
+                        </div>
+                        <div className="flex flex-col border border-hud bg-panel">
+                            {dailies.length === 0 && <div className="p-4 text-muted text-xs tracking-widest">NO ACTIVE DAILIES.</div>}
+                            {dailies.map((d, index) => {
+                                const isDone = d.completedDate === getDayKey(now);
+                                return (
+                                    <div key={d.id} className={`flex items-center justify-between p-4 ${index !== dailies.length - 1 ? 'border-b border-hud' : ''} ${isDone ? 'opacity-50' : ''}`}>
+                                        <div className="flex items-start gap-4 w-full">
+                                            <div onClick={() => handleDailyToggle(d.id)} className={`w-4 h-4 border flex items-center justify-center cursor-pointer mt-0.5 shrink-0 ${isDone ? 'border-muted' : 'border-hud hover:border-white transition-colors'}`}>
+                                                {isDone && <div className="w-2 h-2 bg-muted"></div>}
+                                            </div>
+                                            <div className="flex flex-col flex-1 overflow-hidden">
+                                                <span className={`text-sm tracking-widest truncate ${isDone ? 'line-through text-muted' : 'text-white'}`}>{d.title}</span>
+                                                <span className="text-[10px] text-muted tracking-widest mt-1">+{d.xp} XP {d.stat}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-6 shrink-0">
+                                            <div className="flex flex-col text-right">
+                                                <span className="text-sm font-bold tracking-widest">{d.time || "--:--"}</span>
+                                                <span className="text-[10px] text-muted tracking-widest mt-1">DAILY</span>
+                                            </div>
+                                            <div className="flex items-center gap-3 ml-2">
+                                                <div onClick={() => editDaily(d.id, d.title, d.xp, d.time)}><IconEdit /></div>
+                                                <div onClick={() => deleteDaily(d.id)}><IconDelete /></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+
+                    <section>
+                        <div className="flex items-center justify-between gap-4 mb-6">
+                            <span className="text-[10px] text-muted tracking-[0.3em] uppercase">ACTIVE DIRECTIVES</span>
+                            <div className="flex-1 h-[1px] bg-hud"></div>
+                            <button onClick={() => setQuestModalOpen(true)} className="text-[10px] text-accent hover:text-white tracking-[0.3em] uppercase transition-colors ml-4 shrink-0">
+                                + DEPLOY OBJECTIVE
+                            </button>
+                        </div>
+                        <div className="flex flex-col border border-hud bg-panel">
+                            {quests.length === 0 && <div className="p-4 text-muted text-xs tracking-widest">NO ACTIVE DIRECTIVES.</div>}
+                            {quests.map((q, index) => {
+                                const timeRemaining = q.deadline - now;
+                                const isWarning = !q.done && !q.failed && timeRemaining < 3600000 && timeRemaining > 0;
+                                
+                                return (
+                                    <div key={q.id} className={`flex items-center justify-between p-4 ${index !== quests.length - 1 ? 'border-b border-hud' : ''} ${q.done ? 'opacity-50' : q.failed ? 'bg-red-900/10' : ''}`}>
+                                        <div className="flex items-start gap-4 w-full">
+                                            <div onClick={() => handleQuestToggle(q.id)} className={`w-4 h-4 border flex items-center justify-center mt-0.5 shrink-0 ${q.done ? 'border-muted' : q.failed ? 'border-accent opacity-50 cursor-not-allowed' : 'border-hud cursor-pointer hover:border-white transition-colors'}`}>
+                                                {q.done && <div className="w-2 h-2 bg-muted"></div>}
+                                                {q.failed && <div className="w-2 h-2 bg-accent"></div>}
+                                            </div>
+                                            <div className="flex flex-col flex-1 overflow-hidden">
+                                                <span className={`text-sm tracking-widest truncate ${q.done ? 'line-through text-muted' : q.failed ? 'text-accent' : 'text-white'}`}>{q.title}</span>
+                                                <span className="text-[10px] text-muted tracking-widest mt-1">
+                                                    {q.failed ? `-${q.penalty} XP (PENALTY)` : `+${q.xp} XP ${q.stat}`}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-6 shrink-0">
+                                            <div className="flex flex-col text-right">
+                                                {!q.done && !q.failed && (
+                                                    <>
+                                                        <span className={`text-sm tracking-widest ${isWarning ? 'text-accent animate-pulse' : 'text-white'}`}>
+                                                            {formatTime(timeRemaining)}
+                                                        </span>
+                                                        <span className="text-[10px] text-muted tracking-widest mt-1">REMAINING</span>
+                                                    </>
+                                                )}
+                                                {q.done && <span className="text-[10px] text-muted tracking-widest uppercase">CLEARED</span>}
+                                                {q.failed && <span className="text-[10px] text-accent tracking-widest uppercase animate-pulse">FAILED</span>}
+                                            </div>
+                                            <div onClick={() => deleteQuest(q.id)}><IconDelete /></div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+
+                    {/* QUEST MODAL */}
+                    {isQuestModalOpen && (
+                        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+                            <div className="bg-panel border border-hud p-6 w-full max-w-lg shadow-[0_0_30px_rgba(220,38,38,0.1)]">
+                                <h3 className="text-xs text-accent tracking-[0.3em] mb-6 border-b border-hud pb-2 uppercase">DEPLOY NEW OBJECTIVE</h3>
+                                <form onSubmit={createQuest} className="flex flex-col gap-5">
+                                    <div>
+                                        <label className="block text-[10px] text-muted tracking-widest mb-2">OBJECTIVE</label>
+                                        <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Enter new objective..." className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-accent transition-colors" />
+                                    </div>
+                                    <div className="flex flex-col md:flex-row gap-5">
+                                        <div className="flex-1">
+                                            <label className="block text-[10px] text-muted tracking-widest mb-2">ATTRIBUTE</label>
+                                            <select value={newStat} onChange={e => setNewStat(e.target.value)} className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-accent appearance-none">
+                                                <option value="STR">STR // SIŁA</option>
+                                                <option value="END">END // WYTRZYMAŁOŚĆ</option>
+                                                <option value="INT">INT // INTELEKT</option>
+                                                <option value="DSC">DSC // DYSCYPLINA</option>
+                                            </select>
+                                        </div>
+                                        <div className="w-32">
+                                            <label className="block text-[10px] text-muted tracking-widest mb-2">XP TIER</label>
+                                            <select value={newQuestXp} onChange={e => setNewQuestXp(e.target.value)} className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-accent appearance-none">
+                                                <option value="10">10 XP</option>
+                                                <option value="30">30 XP</option>
+                                                <option value="50">50 XP</option>
+                                                <option value="100">100 XP</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex-1 relative">
+                                            <label className="flex justify-between block text-[10px] text-muted tracking-widest mb-2">
+                                                <span>DEADLINE</span>
+                                            </label>
+                                            <input type="datetime-local" value={newDeadline} onChange={e => setNewDeadline(e.target.value)} className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-accent transition-colors" />
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-4">
+                                        <button type="button" onClick={() => setNewDeadline(getEndOfDayString())} className="text-[10px] text-accent hover:text-white transition-colors tracking-widest">[ END OF DAY ]</button>
+                                        <div className="flex gap-4">
+                                            <button type="button" onClick={() => setQuestModalOpen(false)} className="px-6 py-3 text-xs tracking-widest text-muted hover:text-white transition-colors">CANCEL</button>
+                                            <button type="submit" className="bg-accent text-white px-8 py-3 text-xs tracking-widest font-bold hover:bg-red-700 transition-colors">ADD QUEST</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* DAILY MODAL */}
+                    {isDailyModalOpen && (
+                        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+                            <div className="bg-panel border border-hud p-6 w-full max-w-lg shadow-[0_0_30px_rgba(255,255,255,0.05)]">
+                                <h3 className="text-xs text-white tracking-[0.3em] mb-6 border-b border-hud pb-2 uppercase">ADD RECURRING DAILY</h3>
+                                <form onSubmit={createDaily} className="flex flex-col gap-5">
+                                    <div>
+                                        <label className="block text-[10px] text-muted tracking-widest mb-2">HABIT NAME</label>
+                                        <input type="text" value={newDailyTitle} onChange={e => setNewDailyTitle(e.target.value)} placeholder="e.g. TRENING HYBRYDOWY..." className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-white transition-colors" />
+                                    </div>
+                                    <div className="flex flex-col md:flex-row gap-5">
+                                        <div className="flex-1">
+                                            <label className="block text-[10px] text-muted tracking-widest mb-2">ATTRIBUTE</label>
+                                            <select value={newDailyStat} onChange={e => setNewDailyStat(e.target.value)} className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-white appearance-none">
+                                                <option value="STR">STR</option>
+                                                <option value="END">END</option>
+                                                <option value="INT">INT</option>
+                                                <option value="DSC">DSC</option>
+                                            </select>
+                                        </div>
+                                        <div className="w-32">
+                                            <label className="block text-[10px] text-muted tracking-widest mb-2">XP TIER</label>
+                                            <select value={newDailyXp} onChange={e => setNewDailyXp(e.target.value)} className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-white appearance-none">
+                                                <option value="10">10 XP</option>
+                                                <option value="30">30 XP</option>
+                                                <option value="50">50 XP</option>
+                                                <option value="100">100 XP</option>
+                                            </select>
+                                        </div>
+                                        <div className="w-32">
+                                            <label className="block text-[10px] text-muted tracking-widest mb-2">TIME (OPTIONAL)</label>
+                                            <input type="text" placeholder="05:30" value={newDailyTime} onChange={e => setNewDailyTime(e.target.value)} className="w-full bg-black border border-hud p-3 text-sm text-white focus:outline-none focus:border-white transition-colors" />
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end gap-4 mt-4">
+                                        <button type="button" onClick={() => setDailyModalOpen(false)} className="px-6 py-3 text-xs tracking-widest text-muted hover:text-white transition-colors">CANCEL</button>
+                                        <button type="submit" className="bg-white text-black px-8 py-3 text-xs tracking-widest font-bold hover:bg-gray-200 transition-colors">ADD DAILY</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
