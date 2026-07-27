@@ -109,7 +109,7 @@
             <svg className="w-5 h-5 md:w-4 md:h-4 text-muted hover:text-accent cursor-pointer transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
         );
 
-        const StatCard = ({ statKey, label, level, xp, isRust }) => (
+        const StatCard = ({ statKey, label, level, xp, reqXp, isRust }) => (
             <div className={`bg-panel border rounded-2xl p-4 md:p-5 flex flex-col justify-between gap-4 shadow-lg relative overflow-hidden ${isRust ? 'border-accent/80 bg-red-950/20' : 'border-hud'}`}>
                 {isRust && <div className="absolute top-0 right-0 bg-accent text-white text-[8px] font-bold px-2 py-0.5 tracking-widest uppercase">RUST</div>}
                 <div className="flex items-center justify-between">
@@ -118,13 +118,13 @@
                     </span>
                     <div className="flex flex-col text-right">
                         <span className="text-lg md:text-2xl font-bold tracking-wider">LVL {level}</span>
-                        <span className="text-[10px] md:text-xs text-muted tracking-widest">{xp} / 100 XP</span>
+                        <span className="text-[10px] md:text-xs text-muted tracking-widest">{Math.max(0, xp)} / {reqXp} XP</span>
                     </div>
                 </div>
                 <div>
                     <span className="text-xs md:text-sm font-bold tracking-[0.15em] text-white block mb-2 uppercase">{label}</span>
                     <div className="h-2 w-full bg-black border border-hud rounded-full overflow-hidden">
-                        <div className={`h-full xp-bar-transition rounded-full ${isRust ? 'bg-accent' : 'bg-white'}`} style={{ width: `${Math.min(100, Math.max(0, xp))}%` }}></div>
+                        <div className={`h-full xp-bar-transition rounded-full ${isRust ? 'bg-accent' : 'bg-white'}`} style={{ width: `${Math.min(100, Math.max(0, (xp / reqXp) * 100))}%` }}></div>
                     </div>
                 </div>
             </div>
@@ -133,10 +133,10 @@
         function App() {
             const [player, setPlayer] = useLocalStorage('nexus_player', { level: 1, xp: 0, reqXp: 500 });
             const [stats, setStats] = useLocalStorage('nexus_stats', {
-                STR: { level: 1, xp: 0, label: "SIŁA", rust: false },
-                END: { level: 1, xp: 0, label: "WYTRZYMAŁOŚĆ", rust: false },
-                INT: { level: 1, xp: 0, label: "INTELEKT", rust: false },
-                DSC: { level: 1, xp: 0, label: "DYSCYPLINA", rust: false },
+                STR: { level: 1, xp: 0, reqXp: 100, label: "SIŁA", rust: false },
+                END: { level: 1, xp: 0, reqXp: 100, label: "WYTRZYMAŁOŚĆ", rust: false },
+                INT: { level: 1, xp: 0, reqXp: 100, label: "INTELEKT", rust: false },
+                DSC: { level: 1, xp: 0, reqXp: 100, label: "DYSCYPLINA", rust: false },
             });
             const [dailies, setDailies] = useLocalStorage('nexus_dailies', [
                 { id: 'd1', title: 'POBUDKA 05:30', xp: 30, stat: 'DSC', time: '05:30', streak: 0, completedDate: null },
@@ -169,41 +169,62 @@
                 return "STATUS: OPERATOR INITIATE";
             }, [stats, lockdown]);
 
+            // BEZWSZGLĘDNY SYSTEM DODAWANIA XP I AWANSÓW (z krzywą trudności)
             const addXp = (amount, statKey) => {
                 const effectiveAmount = stats[statKey]?.rust ? Math.round(amount * 0.8) : amount;
+                
+                // Główny Gracz
                 setPlayer(prev => {
                     let { level, xp, reqXp } = prev;
                     xp += effectiveAmount;
                     while (xp >= reqXp) {
                         xp -= reqXp;
                         level += 1;
-                        reqXp = Math.floor(reqXp * 1.2); 
+                        reqXp = Math.floor(reqXp * 1.2); // 20% trudniejszy każdy kolejny level
                     }
                     return { level, xp, reqXp };
                 });
 
+                // Statystyka szczegółowa
                 setStats(prev => {
                     let stat = { ...prev[statKey] };
                     stat.xp += effectiveAmount;
-                    while(stat.xp >= 100) {
-                        stat.xp -= 100;
+                    while (stat.xp >= stat.reqXp) {
+                        stat.xp -= stat.reqXp;
                         stat.level += 1;
+                        stat.reqXp = Math.floor(stat.reqXp * 1.2);
                     }
                     return { ...prev, [statKey]: stat };
                 });
             };
 
+            // BEZWZGLĘDNY SYSTEM ODEJMOWANIA XP I SPADKU POZIOMÓW (Level Down)
             const removeXp = (amount, statKey) => {
                 if (lockdown.active) return;
+
+                // Główny Gracz
                 setPlayer(prev => {
                     let { level, xp, reqXp } = prev;
                     xp -= amount;
+                    while (xp < 0 && level > 1) {
+                        level -= 1;
+                        reqXp = Math.floor(reqXp / 1.2); // Cofnięcie progu trudności
+                        xp += reqXp;
+                    }
+                    if (level === 1 && xp < 0) xp = 0; // Podłoga na 1 levelu
                     return { level, xp, reqXp };
                 });
 
+                // Statystyka szczegółowa
                 setStats(prev => {
                     let stat = { ...prev[statKey] };
                     stat.xp -= amount;
+                    while (stat.xp < 0 && stat.level > 1) {
+                        stat.level -= 1;
+                        stat.reqXp = Math.floor(stat.reqXp / 1.2);
+                        stat.xp += stat.reqXp;
+                    }
+                    if (stat.level === 1 && stat.xp < 0) stat.xp = 0;
                     return { ...prev, [statKey]: stat };
                 });
             };
@@ -389,7 +410,7 @@
                         </div>
                         <div className="flex justify-between text-[9px] md:text-[10px] text-muted mb-2 tracking-widest mt-6 md:mt-8">
                             <span>MAIN XP</span>
-                            <span>{player.xp} / {player.reqXp} XP</span>
+                            <span>{Math.max(0, player.xp)} / {player.reqXp} XP</span>
                         </div>
                         <div className="h-2 w-full bg-black border border-hud rounded-full overflow-hidden">
                             <div className="h-full bg-white xp-bar-transition rounded-full" style={{ width: `${progressPerc}%` }}></div>
@@ -407,7 +428,7 @@
                         </div>
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                             {Object.entries(stats).map(([key, data]) => (
-                                <StatCard key={key} statKey={key} label={data.label} level={data.level} xp={data.xp} isRust={data.rust} />
+                                <StatCard key={key} statKey={key} label={data.label} level={data.level} xp={data.xp} reqXp={data.reqXp} isRust={data.rust} />
                             ))}
                         </div>
                     </section>
@@ -507,7 +528,7 @@
                         </div>
                     </section>
 
-                    {/* DZIENNIK ZDARZEŃ (SYSTEM LOG) - ROZWIJANE OKIENKA */}
+                    {/* DZIENNIK ZDARZEŃ (SYSTEM LOG) */}
                     <section>
                         <div className="flex items-center gap-4 mb-3 md:mb-4">
                             <span className="text-[9px] md:text-[10px] text-muted tracking-[0.3em] uppercase">SYSTEM LOG // REFLECTION</span>
